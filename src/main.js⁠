@@ -1,8 +1,44 @@
-import { createApp } from 'vue';
-import { createPinia } from 'pinia';
-import App from './App.vue';
-import './assets/main.css';
+import { store, cloudRef } from './store.js';
+import { StageManager } from './components/StageManager.js';
 
-const app = createApp(App);
-app.use(createPinia());
+const { createApp, ref, computed, onMounted } = Vue;
+
+const app = createApp({
+  template: `
+    <div id="app-root">
+      <header class="card nav-glass sticky top-2 z-40 mb-4 py-3 px-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xl shadow-md">F</div>
+          <div>
+            <h1 class="font-bold text-base md:text-lg">FFEE Studio 工程管理系統</h1>
+            <p class="text-[11px] text-slate-500">原生 ES 模組組件化 V2.0</p>
+          </div>
+        </div>
+        <button class="btn-pill bg-emerald-600 text-white text-xs" @click="store.saveToCloud()">☁️ 同步雲端</button>
+      </header>
+
+      <div class="card">
+        <h2 class="text-lg font-bold mb-2">專案看板：{{ currentProjectName || '請選擇專案' }}</h2>
+        <p class="text-xs text-slate-500">雲端連線狀態：{{ store.cloudConnected ? '🟢 正常' : '🔴 連線中' }}</p>
+      </div>
+
+      <stage-manager></stage-manager>
+    </div>
+  `,
+  setup() {
+    const currentProjectName = computed(() => store.appData.projects[store.appData.currentProjectId]?.name || '');
+
+    onMounted(() => {
+      cloudRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) { store.appData = Object.assign(store.appData, data); store.cloudConnected = true; }
+        store.applyTheme();
+      });
+    });
+
+    return { store, currentProjectName };
+  }
+});
+
+app.component('stage-manager', StageManager);
 app.mount('#app');
