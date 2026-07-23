@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>室內設計工程進度管理系統 V1.8（工序清單+主材追蹤）</title>
+
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Vue 3 響應式框架 -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<!-- Excel 匯出庫 -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<!-- PDF 匯出庫 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+<style>
+/* CSS 主題變數與基本重置 */
+:root {
+  --bg-main: #f8fafc;
+  --card-bg: #ffffff;
+  --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --border-color: #e2e8f0;
+  --input-bg: #ffffff;
+  --input-text: #0f172a;
+  --table-header-bg: #f1f5f9;
+  --table-even-bg: #f8fafc;
+  --gantt-placeholder: #f1f5f9;
+  --gantt-day-header: #f8fafc;
+  --gantt-weekend-bg: #ffe8e8;
+  --gantt-weekend-text: #dc2626;
+  --hover-bar-bg: rgba(59, 130, 246, 0.18);
+  --hover-bar-border: rgba(59, 130, 246, 0.4);
+}
+
+body.dark-mode {
+  --bg-main: #0f172a;
+  --card-bg: #1e293b;
+  --card-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --input-bg: #0f172a;
+  --input-text: #f8fafc;
+  --table-header-bg: #334155;
+  --table-even-bg: #1e293b;
+  --gantt-placeholder: #0f172a;
+  --gantt-day-header: #334155;
+  --gantt-weekend-bg: #451a1a;
+  --gantt-weekend-text: #fca5a5;
+  --hover-bar-bg: rgba(96, 165, 250, 0.25);
+  --hover-bar-border: rgba(96, 165, 250, 0.5);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background-color: var(--bg-main) !important;
+  color: var(--text-main) !important;
+  padding: 12px;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  padding-bottom: 75px;
+}
+
+body.font-size-sm { font-size: 13px; }
+body.font-size-sm table th, body.font-size-sm table td { font-size: 12px; padding: 6px 8px; }
+body.font-size-sm .btn { font-size: 12px; padding: 6px 12px; }
+
+body.font-size-md { font-size: 15px; }
+body.font-size-md table th, body.font-size-md table td { font-size: 14px; padding: 8px 10px; }
+body.font-size-md .btn { font-size: 14px; padding: 8px 14px; }
+
+body.font-size-lg { font-size: 17px; }
+body.font-size-lg table th, body.font-size-lg table td { font-size: 16px; padding: 10px 12px; }
+body.font-size-lg .btn { font-size: 16px; padding: 10px 16px; }
+
+.layout-wrap { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+@media (max-width: 768px) {
+  .layout-wrap { grid-template-columns: 1fr; gap: 12px; }
+  body { padding: 8px; padding-bottom: 75px; }
+}
+
+.card {
+  background-color: var(--card-bg) !important;
+  color: var(--text-main) !important;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.flex-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+th, td { border: 1px solid var(--border-color); text-align: center; color: var(--text-main); }
+th { background-color: var(--table-header-bg); position: sticky; top: 0; }
+tr:nth-child(even) { background-color: var(--table-even-bg); }
+
+input, select, textarea {
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px;
+  outline: none;
+  min-height: 36px;
+}
+input:focus, select:focus, textarea:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+input[type="checkbox"] { min-height: auto; }
+
+.btn {
+  border: none; border-radius: 8px; color: #fff; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 36px; font-weight: 500; transition: opacity 0.2s, transform 0.1s;
+  touch-action: manipulation;
+}
+.btn:active { transform: scale(0.97); }
+.btn-sm { min-height: 28px !important; padding: 4px 8px !important; font-size: 12px !important; }
+.btn-blue { background: #3b82f6; }
+.btn-green { background: #10b981; }
+.btn-red { background: #ef4444; }
+.btn-gray { background: #6b7280; }
+.btn-orange { background: #f97316; }
+.btn-purple { background: #8b5cf6; }
+.btn-dark { background: #1f2937; }
+body.dark-mode .btn-dark { background: #374151; }
+
+.progress-wrap { width: 100%; height: 10px; background: var(--border-color); border-radius: 5px; overflow: hidden; }
+.progress-bar { height: 100%; background: #3b82f6; transition: 0.3s; }
+
+.calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 6px; }
+.calendar-week-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+.calendar-week-label { text-align: center; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.calendar-day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-day { text-align: center; font-size: 12px; padding: 6px 2px; border-radius: 4px; }
+.cal-weekend { background: var(--gantt-weekend-bg); color: var(--gantt-weekend-text); } 
+.cal-holiday { background: #ffedd5; color: #c2410c; font-weight: 600; } 
+body.dark-mode .cal-holiday { background: #7c2d12; color: #ffedd5; }
+.cal-custom-holiday { background: #dcfce7; color: #15803d; font-weight: 600; }
+body.dark-mode .cal-custom-holiday { background: #14532d; color: #dcfce7; }
+.cal-today { border: 2px solid #2563eb; font-weight: bold; }
+.cal-other-month { color: var(--text-muted); opacity: 0.4; }
+
+.stage-tag { display: flex; align-items: center; gap: 6px; background: var(--table-header-bg); padding: 4px 8px; border-radius: 6px; }
+.color-picker-sm { width: 28px; height: 28px; border: none; cursor: pointer; border-radius: 4px; }
+
+.gantt-container { overflow-x: auto; margin-top: 10px; background: var(--card-bg); position: relative; -webkit-overflow-scrolling: touch; }
+.gantt-wrap { min-width: 850px; position: relative; background: var(--card-bg); padding: 8px; }
+
+.gantt-month-row { display: flex; border-bottom: 1px solid var(--border-color); }
+.gantt-month-label-placeholder { width: 160px; flex-shrink: 0; background: var(--gantt-placeholder); border-right: 1px solid var(--border-color); position: sticky; left: 0; z-index: 11; }
+@media (min-width: 768px) { .gantt-month-label-placeholder { width: 200px; } }
+
+.gantt-months-container { display: flex; flex: 1; }
+.gantt-month-cell { text-align: center; font-size: 12px; font-weight: bold; background: var(--gantt-day-header); padding: 4px 0; border-right: 1px solid var(--border-color); color: var(--text-muted); }
+
+.gantt-header { display: flex; border-bottom: 1px solid var(--border-color); }
+.gantt-task-label { flex-shrink: 0; width: 160px; padding: 6px; border-right: 1px solid var(--border-color); background: var(--card-bg); position: sticky; left: 0; z-index: 10; color: var(--text-main); font-size: 13px; font-weight: 500; }
+@media (min-width: 768px) { .gantt-task-label { width: 200px; } }
+
+.gantt-days-row { display: flex; flex: 1; }
+.gantt-day-cell { width: 34px; text-align: center; font-size: 11px; padding: 4px 0; border-right: 1px solid var(--border-color); position: relative; z-index: 2; color: var(--text-main); }
+.gantt-day-weekend { color: var(--gantt-weekend-text); font-weight: bold; }
+.gantt-weekend-column { position: absolute; top: 0; bottom: 0; width: 34px; background: var(--gantt-weekend-bg); opacity: 0.4; pointer-events: none; z-index: 1; }
+.gantt-task-row { display: flex; border-bottom: 1px solid var(--border-color); align-items: center; position: relative; }
+.gantt-bar-box { flex: 1; position: relative; height: 42px; }
+
+.gantt-col-hover {
+  position: absolute; top: 0; bottom: 0; width: 34px;
+  background: var(--hover-bar-bg); pointer-events: none; z-index: 2;
+  border-left: 1px solid var(--hover-bar-border); border-right: 1px solid var(--hover-bar-border);
+}
+
+.gantt-baseline-bar { position: absolute; height: 12px; top: 2px; border-radius: 3px; border: 1.5px dashed #94a3b8; background: rgba(148, 163, 184, 0.25); pointer-events: none; z-index: 2; }
+
+.gantt-bar {
+  position: absolute; height: 24px; top: 15px; border-radius: 6px; opacity: 0.9; color: #fff;
+  font-size: 11px; text-align: left; line-height: 24px; z-index: 3;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2); overflow: hidden; white-space: nowrap;
+  padding: 0; display: flex; align-items: center; justify-content: space-between;
+  cursor: grab; user-select: none; touch-action: pan-y;
+  transition: left 0.1s ease, width 0.1s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.gantt-bar.status-notstart { opacity: 0.7 !important; }
+.gantt-bar.status-done { text-decoration: line-through; opacity: 0.65; }
+.gantt-bar.status-doing { font-weight: bold; border: 2px solid #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.6); opacity: 1.0; }
+.gantt-bar.is-critical { border: 2px solid #ef4444 !important; box-shadow: 0 0 8px rgba(239, 68, 68, 0.8) !important; }
+
+.gantt-bar.is-dragging { transform: translateY(-4px) scale(1.02) !important; box-shadow: 0 12px 20px -4px rgba(0,0,0,0.35), 0 0 12px rgba(59, 130, 246, 0.6) !important; z-index: 50 !important; cursor: grabbing !important; }
+.gantt-ghost-bar { position: absolute; height: 24px; top: 15px; border-radius: 6px; border: 2px dashed #3b82f6; background: rgba(59, 130, 246, 0.15); pointer-events: none; z-index: 2; }
+
+.gantt-milestone-wrapper { position: absolute; height: 42px; top: 0; display: flex; align-items: center; z-index: 4; cursor: grab; user-select: none; touch-action: pan-y; transition: left 0.1s ease, transform 0.15s ease; }
+.gantt-milestone-wrapper.is-critical .gantt-milestone-diamond { border-color: #ef4444 !important; box-shadow: 0 0 10px #ef4444; }
+
+.gantt-milestone-diamond { width: 20px; height: 20px; transform: rotate(45deg); box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid #fff; flex-shrink: 0; }
+.gantt-milestone-text { font-size: 11px; font-weight: bold; margin-left: 8px; white-space: nowrap; }
+
+.gantt-bar-text { flex: 1; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; white-space: nowrap; }
+.gantt-handle { width: 14px; height: 100%; background: rgba(255,255,255,0.4); cursor: ew-resize; flex-shrink: 0; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 12px; }
+.modal-content { background: var(--card-bg); color: var(--text-main); padding: 18px; border-radius: 12px; width: 650px; max-width: 100%; max-height: 85vh; overflow-y: auto; border: 1px solid var(--border-color); }
+
+body.readonly-mode .admin-only { display: none !important; }
+
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap: 8px; }
+.photo-card { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); }
+.photo-card img { width: 100%; height: 100%; object-fit: cover; }
+
+.mobile-bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--card-bg); border-top: 1px solid var(--border-color);
+  display: flex; justify-around: space-around; align-items: center;
+  height: 60px; z-index: 500; box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+}
+.mobile-nav-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: var(--text-muted); gap: 2px; border: none; background: transparent; }
+.mobile-nav-btn.active { color: #3b82f6; font-weight: bold; }
+
+.kanban-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+.kanban-col { flex: 1; min-width: 250px; background: var(--table-header-bg); border-radius: 10px; padding: 12px; border: 1px solid var(--border-color); }
+.kanban-card { background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color); padding: 10px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+
+@media (max-width: 768px) {
+  .desktop-table { display: none; }
+  .mobile-task-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+}
+@media (min-width: 769px) { .mobile-task-list { display: none; } }
+</style>
+</head>
+
+<body class="font-size-md">
+
+<div id="app">
+    <input type="file" ref="fileInput" accept=".json" class="hidden admin-only" @change="handleFileImport">
+
+    <!-- 系統密碼登入 Modal -->
+    <div v-if="showLoginModal" class="modal-overlay" style="z-index: 9999; background: var(--bg-main);">
+        <div class="modal-content text-center" style="max-width: 400px; padding: 30px 20px;">
+            <h2 class="text-xl font-bold mb-2">🔒 系統登入</h2>
+            <p class="mb-4 text-xs opacity-80 text-gray-500">此系統已受到保護，請輸入密碼</p>
+            <input type="password" v-model="loginPasswordInput" @keyup.enter="verifyLogin" class="w-full mb-4 px-4 py-2 border rounded text-center text-base" placeholder="請輸入登入密碼">
+            <button class="btn btn-blue w-full justify-center py-2.5 text-base font-bold" @click="verifyLogin">進入系統</button>
+            <p v-if="loginError" class="text-red-500 mt-3 text-xs font-semibold">❌ 密碼錯誤，請重試！</p>
+        </div>
+    </div>
+
+    <!-- 客戶唯讀模式提示 Banner -->
+    <div v-if="store.isReadOnlyMode" class="bg-blue-600 text-white text-center py-2 px-3 font-bold text-xs md:text-sm mb-3 rounded-lg shadow-md flex justify-between items-center">
+        <span>👀 目前以「客戶唯讀模式」檢視中</span>
+        <span class="bg-blue-800 px-2 py-0.5 rounded text-xs">{{ currentProjectName }}</span>
+    </div>
+
+    <div class="layout-wrap">
+        <!-- 左側側邊欄 -->
+        <div class="flex flex-col gap-3">
+            <div class="card mb-0 flex justify-between items-center py-2.5">
+                <span class="font-bold text-xs md:text-sm">雲端狀態：</span>
+                <span :class="['sync-status text-xs px-2 py-0.5 rounded', store.cloudConnected ? 'status-online bg-green-100 text-green-800' : 'status-offline bg-red-100 text-red-800']">
+                    {{ store.cloudConnected ? '🟢 同步正常' : '🔴 連線中...' }}
+                </span>
+            </div>
+
+            <button class="md:hidden btn btn-gray text-xs w-full py-2 flex justify-between" @click="showMobileSidebar = !showMobileSidebar">
+                <span>📅 排期月曆與專案設定</span>
+                <span>{{ showMobileSidebar ? '▲ 收折' : '▼ 展開' }}</span>
+            </button>
+
+            <div v-show="showMobileSidebar || isDesktop" class="flex flex-col gap-3">
+                <mini-calendar></mini-calendar>
+
+                <div class="card mb-0 admin-only">
+                    <h4 class="font-semibold mb-2 text-xs md:text-sm flex items-center gap-1">📂 專案切換</h4>
+                    <select v-model="store.appData.currentProjectId" class="text-xs md:text-sm p-1.5 border rounded w-full">
+                        <option value="">請選擇專案</option>
+                        <option v-for="pid in store.appData.projectList" :key="pid" :value="pid">
+                            {{ store.appData.projects[pid]?.name }}
+                        </option>
+                    </select>
+                </div>
+
+                <custom-holiday-manager></custom-holiday-manager>
+            </div>
+        </div>
+
+        <!-- 右側主要內容區 -->
+        <div class="main-area">
+            <div class="card">
+                <div class="flex flex-col md:flex-row justify-between md:items-center gap-2 mb-3">
+                    <h2 class="text-lg md:text-xl font-bold">室內設計工程進度管理</h2>
+                    <div class="hidden md:flex flex-row gap-2">
+                        <button class="btn btn-purple text-xs" @click="showMaterialModal = true">📦 主材追蹤</button>
+                        <button class="btn btn-blue text-xs" @click="showSiteLogsModal = true">📷 施工日誌</button>
+                        <button class="btn btn-dark text-xs" @click="showChangelogModal = true">📋 更新日誌</button>
+                        <button class="btn btn-orange text-xs admin-only" @click="copyClientShareLink">🔗 複製唯讀網址</button>
+                        <button class="btn btn-dark text-xs admin-only" @click="showSettingsModal = true">⚙️ 設定</button>
+                        <button class="btn btn-blue text-xs admin-only" @click="store.saveToCloud()">☁️ 雲端儲存</button>
+                        <button class="btn btn-green text-xs admin-only" @click="exportColorExcel">📤 匯出 Excel</button>
+                    </div>
+                </div>
+
+                <!-- 專案控制列 -->
+                <div class="flex-row mb-3 admin-only text-xs md:text-sm">
+                    <label class="font-medium hidden md:inline">專案：</label>
+                    <select v-model="store.appData.currentProjectId" class="flex-1 md:w-44 text-xs p-1">
+                        <option value="">請選擇專案</option>
+                        <option v-for="pid in store.appData.projectList" :key="pid" :value="pid">
+                            {{ store.appData.projects[pid]?.name }}
+                        </option>
+                    </select>
+                    <button class="btn btn-gray btn-sm" @click="renameCurrentProject">✏️ 重命名</button>
+                    <button class="btn btn-orange btn-sm" @click="duplicateCurrentProject">📋 複製</button>
+                    <button class="btn btn-purple btn-sm" @click="saveBaseline">🔒 鎖定/更新基準線 (Baseline)</button>
+                    
+                    <div class="w-full flex gap-2 mt-1 md:mt-0 md:w-auto">
+                        <input v-model="newProjectName" placeholder="輸入新專案名稱" class="flex-1 text-xs px-2">
+                        <button class="btn btn-blue btn-sm whitespace-nowrap" @click="addNewProject">+ 新設</button>
+                        <button class="btn btn-red btn-sm whitespace-nowrap" @click="deleteCurrentProject">刪除</button>
+                    </div>
+                </div>
+
+                <!-- 進度條看板 -->
+                <div class="flex-row items-center gap-3">
+                    <div style="flex:1;">
+                        <div class="flex justify-between text-xs font-semibold mb-1">
+                            <span>整體專案進度</span>
+                            <span>{{ progressPercent }}%</span>
+                        </div>
+                        <div class="progress-wrap">
+                            <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
+                        </div>
+                    </div>
+                    <div class="text-xs font-medium whitespace-nowrap">總日曆：<span class="font-bold text-blue-500">{{ totalDayCount }}</span> 天</div>
+                </div>
+            </div>
+
+            <!-- 視圖切換與進用設定 (Gantt vs Kanban) -->
+            <div class="card">
+                <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <button :class="['btn btn-sm', currentView === 'gantt' ? 'btn-blue' : 'btn-gray']" @click="currentView = 'gantt'">📊 甘特圖模式</button>
+                        <button :class="['btn btn-sm', currentView === 'kanban' ? 'btn-blue' : 'btn-gray']" @click="currentView = 'kanban'">📌 Kanban 看板模式</button>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs">
+                        <label class="flex items-center gap-1 cursor-pointer font-bold text-red-500">
+                            <input type="checkbox" v-model="showCPM"> 🔥 高亮關鍵路徑 (CPM)
+                        </label>
+                        <label class="flex items-center gap-1 cursor-pointer font-medium text-gray-500">
+                            <input type="checkbox" v-model="showBaseline"> 顯示基準線
+                        </label>
+                    </div>
+                </div>
+                <div v-if="currentView === 'gantt'" class="gantt-set-panel flex gap-2 items-center text-xs flex-wrap">
+                    <div><label>起：</label><input type="date" v-model="customGanttStart" class="p-1 text-xs"></div>
+                    <div><label>止：</label><input type="date" v-model="customGanttEnd" class="p-1 text-xs"></div>
+                    <button class="btn btn-orange btn-sm" @click="resetGanttDates">重置</button>
+                </div>
+            </div>
+
+            <!-- 甘特圖組件 / 看板視圖切換 -->
+            <gantt-chart v-if="currentView === 'gantt'" :custom-start="customGanttStart" :custom-end="customGanttEnd" :show-cpm="showCPM" :show-baseline="showBaseline" @edit-task="openEditTaskModal"></gantt-chart>
+            <kanban-view v-if="currentView === 'kanban'" @edit-task="openEditTaskModal"></kanban-view>
+
+            <!-- 施工階段管理組件 -->
+            <stage-manager></stage-manager>
+
+            <!-- 工序任務表格組件 -->
+            <task-table @edit-task="openEditTaskModal"></task-table>
+        </div>
+    </div>
+
+    <!-- 📱 手機端底部導覽列 -->
+    <div class="md:hidden mobile-bottom-nav admin-only">
+        <button class="mobile-nav-btn" @click="showMaterialModal = true">
+            <span class="text-lg">📦</span><span>主材追蹤</span>
+        </button>
+        <button class="mobile-nav-btn" @click="showSiteLogsModal = true">
+            <span class="text-lg">📷</span><span>施工日誌</span>
+        </button>
+        <button class="mobile-nav-btn active" @click="store.saveToCloud()">
+            <span class="text-lg">☁️</span><span>雲端儲存</span>
+        </button>
+        <button class="mobile-nav-btn" @click="showSettingsModal = true">
+            <span class="text-lg">⚙️</span><span>設定</span>
+        </button>
+    </div>
+
+    <!-- ================= 彈窗 Modals ================= -->
+    
+    <!-- 📦 主材進場追蹤 Modal -->
+    <div v-if="showMaterialModal" class="modal-overlay" @click.self="showMaterialModal = false">
+        <div class="modal-content" style="width: 800px; max-width: 95%;">
+            <div class="flex justify-between items-center mb-3 border-b pb-2">
+                <h3 class="text-base font-bold flex items-center gap-2">📦 主材進場時間追蹤</h3>
+                <button @click="showMaterialModal = false" class="text-gray-500 font-bold text-lg">&times;</button>
+            </div>
+            
+            <div v-if="!store.isReadOnlyMode" class="flex flex-wrap gap-2 mb-4 p-3 bg-blue-50 dark:bg-gray-800 rounded border border-blue-100 text-xs">
+                <input type="text" v-model="newMaterial.name" placeholder="主材名稱 (如: 磁磚)" class="p-1.5 flex-1 min-w-[120px]">
+                <input type="date" v-model="newMaterial.expectedDate" class="p-1.5">
+                <select v-model="newMaterial.status" class="p-1.5">
+                    <option value="待訂購">待訂購</option>
+                    <option value="已訂購">已訂購</option>
+                    <option value="已進場">✅ 已進場</option>
+                </select>
+                <input type="text" v-model="newMaterial.note" placeholder="備註" class="p-1.5 flex-1 min-w-[100px]">
+                <button class="btn btn-blue px-3 py-1.5" @click="addMaterial">+ 新增</button>
+            </div>
+
+            <div class="overflow-x-auto text-xs">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 dark:bg-gray-700">
+                            <th class="p-2 border">主材名稱</th>
+                            <th class="p-2 border">預計進場日</th>
+                            <th class="p-2 border">狀態</th>
+                            <th class="p-2 border">備註</th>
+                            <th v-if="!store.isReadOnlyMode" class="p-2 border text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-if="currentMaterials.length === 0">
+                            <td colspan="5" class="p-4 text-center text-gray-500">尚無主材追蹤紀錄</td>
+                        </tr>
+                        <tr v-for="mat in currentMaterials" :key="mat.id" class="border-b">
+                            <td class="p-2 border font-semibold">{{ mat.name }}</td>
+                            <td class="p-2 border">
+                                <input v-if="!store.isReadOnlyMode" type="date" v-model="mat.expectedDate" @change="store.saveStateSnapshot()" class="p-1 w-full bg-transparent">
+                                <span v-else>{{ mat.expectedDate }}</span>
+                            </td>
+                            <td class="p-2 border">
+                                <select v-if="!store.isReadOnlyMode" v-model="mat.status" @change="store.saveStateSnapshot()" class="p-1 w-full bg-transparent font-bold" :class="{'text-green-600': mat.status==='已進場', 'text-orange-500': mat.status==='已訂購'}">
+                                    <option value="待訂購">待訂購</option>
+                                    <option value="已訂購">已訂購</option>
+                                    <option value="已進場">✅ 已進場</option>
+                                </select>
+                                <span v-else :class="{'text-green-600': mat.status==='已進場', 'font-bold':true}">{{ mat.status }}</span>
+                            </td>
+                            <td class="p-2 border">
+                                <input v-if="!store.isReadOnlyMode" type="text" v-model="mat.note" @change="store.saveStateSnapshot()" class="p-1 w-full bg-transparent">
+                                <span v-else>{{ mat.note }}</span>
+                            </td>
+                            <td v-if="!store.isReadOnlyMode" class="p-2 border text-center">
+                                <button class="text-red-500 font-bold" @click="removeMaterial(mat.id)">刪除</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 編輯任務 Modal (包含驗收子清單 Checklists ✅) -->
+    <div v-if="showEditTaskModal" class="modal-overlay" @click.self="cancelTaskEdit">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-3 border-b pb-2">
+                <h3 class="text-base font-bold">✏️ 編輯工序、子清單與照片</h3>
+                <button @click="cancelTaskEdit" class="text-gray-500 font-bold text-lg">&times;</button>
+            </div>
+            <div v-if="editingTask" class="flex flex-col gap-2.5 text-xs md:text-sm">
+                <div>
+                    <label class="font-semibold block mb-1">階段：</label>
+                    <select v-model="editingTask.stage" class="w-full text-xs">
+                        <option v-for="st in store.appData.stageList" :key="st.name" :value="st.name">{{ st.name }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="font-semibold block mb-1">工作內容：</label>
+                    <input type="text" v-model="editingTask.content" class="w-full text-xs p-1">
+                </div>
+                
+                <div>
+                    <label class="font-semibold block mb-1 text-blue-600 dark:text-blue-400">🔗 前置任務 (Finish-to-Start)：</label>
+                    <select v-model="editingTask.dependsOn" class="w-full text-xs">
+                        <option :value="null">-- 無 (獨立工序) --</option>
+                        <option v-for="t in possibleParents" :key="t.id" :value="t.id">
+                            #{{ getTaskIndex(t.id) }} {{ t.content }} (結束日期: {{ t.end }})
+                        </option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="font-semibold block mb-1">開始日期：</label>
+                        <input type="date" v-model="editingTask.start" class="w-full text-xs">
+                    </div>
+                    <div>
+                        <label class="font-semibold block mb-1">結束日期：</label>
+                        <input type="date" v-model="editingTask.end" class="w-full text-xs">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="font-semibold block mb-1">負責人：</label>
+                        <select v-model="editingTask.worker" class="w-full text-xs">
+                            <option value="">-- 請選擇 --</option>
+                            <option v-for="w in store.appData.staffList" :key="w" :value="w">{{ w }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="font-semibold block mb-1">狀態：</label>
+                        <select :value="editingTask.status" @change="handleEditTaskStatusChange($event.target.value)" class="w-full text-xs">
+                            <option value="未開始">未開始</option>
+                            <option value="進行中">進行中</option>
+                            <option value="已完成">已完成</option>
+                            <option value="已延期">已延期</option>
+                            <option value="里程碑">🚩 里程碑</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="font-semibold block mb-1">備註：</label>
+                    <textarea v-model="editingTask.remark" rows="2" class="w-full text-xs p-1"></textarea>
+                </div>
+
+                <!-- ✅ 驗收子清單 (Task Checklists) -->
+                <div class="border-t pt-2 mt-1 bg-gray-50 dark:bg-gray-800 p-2 rounded">
+                    <label class="font-bold block mb-2 text-blue-700 dark:text-blue-300">✅ 驗收子清單 (Checklist)</label>
+                    <div v-if="!store.isReadOnlyMode" class="flex gap-2 mb-2">
+                        <input type="text" v-model="newChecklistItemText" @keyup.enter="addChecklistItem" placeholder="輸入檢查項目..." class="w-full text-xs p-1.5 border rounded">
+                        <button class="btn btn-blue btn-sm whitespace-nowrap" @click="addChecklistItem">新增</button>
+                    </div>
+                    <div class="flex flex-col gap-1 max-h-32 overflow-y-auto">
+                        <div v-if="!editingTask.checklists || editingTask.checklists.length === 0" class="text-xs text-gray-400 italic">無子清單項目</div>
+                        <div v-for="(item, idx) in editingTask.checklists" :key="item.id" class="flex items-center justify-between bg-white dark:bg-gray-700 p-1.5 rounded border border-gray-200 dark:border-gray-600">
+                            <label class="flex items-center gap-2 cursor-pointer flex-1 text-xs m-0">
+                                <input type="checkbox" v-model="item.isDone" :disabled="store.isReadOnlyMode" class="w-3.5 h-3.5 accent-blue-500">
+                                <span :class="{ 'line-through text-gray-400': item.isDone }">{{ item.text }}</span>
+                            </label>
+                            <button v-if="!store.isReadOnlyMode" @click="removeChecklistItem(idx)" class="text-red-500 font-bold px-2">&times;</button>
+                        </div>
+                    </div>
+                    <div class="text-[10px] text-gray-500 mt-2">※ 提示：必須勾選所有子清單項目，才能將此任務設為「已完成」。</div>
+                </div>
+
+                <!-- 📷 單一任務施工照片打卡 -->
+                <div class="border-t pt-2 mt-1">
+                    <label class="font-semibold block mb-1">📷 此工序施工照片紀錄：</label>
+                    <div v-if="editingTask.photos && editingTask.photos.length > 0" class="photo-grid mb-2">
+                        <div v-for="(p, i) in editingTask.photos" :key="i" class="photo-card">
+                            <img :src="p.url" @click="previewImage(p.url)">
+                        </div>
+                    </div>
+                    <div v-if="!store.isReadOnlyMode" class="flex gap-2">
+                        <input type="file" ref="taskPhotoFile" accept="image/*" class="text-xs flex-1">
+                        <button class="btn btn-blue text-xs px-2 py-1" :disabled="isTaskPhotoUploading" @click="uploadTaskPhoto">
+                            {{ isTaskPhotoUploading ? '上傳中...' : '上傳照片' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-4">
+                <button class="btn btn-gray btn-sm" @click="cancelTaskEdit">取消</button>
+                <button class="btn btn-blue btn-sm admin-only" @click="saveTaskChanges">💾 儲存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="showChangelogModal" class="modal-overlay" @click.self="showChangelogModal = false">
+        <div class="modal-content"><div class="flex justify-between items-center mb-3 border-b pb-2"><h3 class="text-base font-bold flex items-center gap-1">📋 系統更新紀錄</h3><button @click="showChangelogModal = false" class="text-gray-500 font-bold text-lg">&times;</button></div><div class="space-y-3 text-xs max-h-96 overflow-y-auto pr-1"><div v-for="log in changelogList" :key="log.version" class="p-2.5 bg-gray-50 dark:bg-gray-800 rounded border"><div class="flex justify-between items-center mb-1"><span class="font-bold text-blue-600 text-sm">{{ log.version }}</span><span class="text-gray-400 text-[10px]">{{ log.date }}</span></div><ul class="list-disc list-inside space-y-0.5"><li v-for="(item, idx) in log.changes" :key="idx">{{ item }}</li></ul></div></div></div>
+    </div>
+    
+    <div v-if="previewImgUrl" class="modal-overlay" style="z-index: 10000;" @click="previewImgUrl = null">
+        <div class="relative max-w-full max-h-full p-2">
+            <img :src="previewImgUrl" class="max-w-full max-h-[85vh] rounded shadow-2xl object-contain">
+            <button class="absolute top-4 right-4 bg-black/60 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center">&times;</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp, ref, reactive, computed, onMounted, onUnmounted } = Vue;
+
+const firebaseConfig = {
+  apiKey: "8k51yPMqdWNUOMGw60bkRgRfBL3IfrnUbIZgGW9L",
+  authDomain: "ffee-studio-working-list.firebaseapp.com",
+  databaseURL: "https://ffee-studio-working-list-default-rtdb.firebaseio.com",
+  projectId: "ffee-studio-working-list",
+  storageBucket: "ffee-studio-working-list.firebasestorage.app"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const storage = firebase.storage();
+const cloudRef = db.ref('decorScheduleData');
+
+const fixedHolidays = { "01-01":"元旦", "05-01":"勞動節", "07-01":"香港特區成立紀念日", "10-01":"國慶日", "12-25":"聖誕節", "12-26":"聖誕節翌日" };
+const dynamicHolidaysByYear = {
+    "2024": { "02-10":"農曆年初一", "02-12":"農曆年初三", "03-29":"耶穌受難節", "04-01":"復活節", "04-04":"清明節", "05-15":"佛誕", "06-10":"端午節", "09-18":"中秋節翌日", "10-11":"重陽節" },
+    "2025": { "01-29":"農曆年初一", "01-30":"農曆年初二", "04-04":"清明節", "04-18":"耶穌受難節", "05-05":"佛誕", "05-31":"端午節", "10-07":"中秋節翌日", "10-29":"重陽節" },
+    "2026": { "02-17":"農曆年初一", "02-18":"農曆年初二", "04-03":"耶穌受難節", "04-06":"復活節", "05-25":"佛誕翌日", "06-19":"端午節", "09-26":"中秋節翌日", "10-19":"重陽節翌日" }
+};
+function getHolidayName(year, monthDayStr) {
+    if (dynamicHolidaysByYear[year]?.[monthDayStr]) return dynamicHolidaysByYear[year][monthDayStr];
+    return fixedHolidays[monthDayStr] || null;
+}
+function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function getDaysBetween(sStr, eStr) { let s = new Date(sStr); let e = new Date(eStr); return Math.round((e - s) / (1000 * 60 * 60 * 24)); }
+function addDaysStr(dateStr, days) { let d = new Date(dateStr); d.setDate(d.getDate() + days); return formatDate(d); }
+
+const store = reactive({
+    isReadOnlyMode: false, cloudConnected: false,
+    appData: {
+        loginPassword: "", projectList: [], currentProjectId: null, excludeHolidays: false,
+        themeMode: 'light', fontSize: 'md', staffList: ["陳大文", "張師傅", "李工"],
+        stageList: [
+            {name:"設計準備與啟動", color:"#2563eb"}, {name:"方案設計", color:"#0891b2"},
+            {name:"施工圖設計", color:"#059669"}, {name:"施工準備", color:"#d97706"},
+            {name:"現場施工", color:"#dc2626"}, {name:"竣工驗收", color:"#7c3aed"}
+        ],
+        projects: {}, customHolidays: {}
+    },
+    undoStack: [],
+    saveStateSnapshot() {
+        if (this.isReadOnlyMode) return;
+        if (this.undoStack.length >= 20) this.undoStack.shift();
+        this.undoStack.push(JSON.parse(JSON.stringify(this.appData)));
+    },
+    undo() {
+        if (this.isReadOnlyMode || this.undoStack.length === 0) return;
+        this.appData = this.undoStack.pop();
+        this.applyTheme(); this.applyFontSize();
+    },
+    saveToCloud() {
+        if (this.isReadOnlyMode) return;
+        cloudRef.set(this.appData).then(() => alert('☁️ 已成功同步至雲端！')).catch(err => alert('❌ 儲存失敗：' + err.message));
+    },
+    applyTheme() { document.body.classList.toggle('dark-mode', this.appData.themeMode === 'dark'); },
+    applyFontSize() {
+        document.body.classList.remove('font-size-sm', 'font-size-md', 'font-size-lg');
+        document.body.classList.add(`font-size-${this.appData.fontSize || 'md'}`);
+    },
+    propagateTaskDates(tasks, changedTaskId) {
+        let changed = true;
+        while (changed) {
+            changed = false;
+            tasks.forEach(t => {
+                if (t.dependsOn) {
+                    const parent = tasks.find(p => p.id === t.dependsOn);
+                    if (parent && parent.end) {
+                        const requiredStart = addDaysStr(parent.end, 1);
+                        if (new Date(t.start) < new Date(requiredStart)) {
+                            const duration = getDaysBetween(t.start, t.end);
+                            t.start = requiredStart;
+                            t.end = addDaysStr(t.start, duration);
+                            changed = true;
+                        }
+                    }
+                }
+            });
+        }
+    }
+});
+
+const MiniCalendar = {
+    template: `<div class="card mb-0 text-xs"><h3 class="font-semibold mb-2 text-xs md:text-sm">工程排期月曆</h3><div class="calendar-header"><select v-model="year" class="p-0.5 border rounded"><option v-for="y in 8" :key="y" :value="2022+y">{{ 2022+y }}</option></select><span>年</span><select v-model="month" class="p-0.5 border rounded"><option v-for="m in 12" :key="m" :value="m-1">{{ m }}月</option></select></div><div class="calendar-week-row"><div v-for="w in ['日','一','二','三','四','五','六']" :key="w" class="calendar-week-label">{{ w }}</div></div><div class="calendar-day-grid"><div v-for="p in firstDayWeek" :key="'p'+p" class="cal-day cal-other-month">{{ prevMonthLastDay - firstDayWeek + p }}</div><div v-for="d in totalDays" :key="'d'+d" :class="getDayClass(d)" :title="getDayTitle(d)" class="cal-day">{{ d }}</div></div></div>`,
+    setup() {
+        const year = ref(new Date().getFullYear()); const month = ref(new Date().getMonth()); const today = new Date();
+        const firstDayWeek = computed(() => new Date(year.value, month.value, 1).getDay());
+        const totalDays = computed(() => new Date(year.value, month.value + 1, 0).getDate());
+        const prevMonthLastDay = computed(() => new Date(year.value, month.value, 0).getDate());
+        function getDayClass(d) {
+            const mStr = `${String(month.value+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const fStr = `${year.value}-${mStr}`;
+            const isT = year.value === today.getFullYear() && month.value === today.getMonth() && d === today.getDate();
+            if (store.appData.customHolidays?.[fStr]) return ['cal-custom-holiday', isT?'cal-today':''];
+            if (getHolidayName(year.value, mStr)) return ['cal-holiday', isT?'cal-today':''];
+            if (new Date(year.value, month.value, d).getDay() % 6 === 0) return ['cal-weekend', isT?'cal-today':''];
+            return [isT?'cal-today':''];
+        }
+        function getDayTitle(d) {
+            const mStr = `${String(month.value+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            return store.appData.customHolidays?.[`${year.value}-${mStr}`] || getHolidayName(year.value, mStr) || '';
+        }
+        return { year, month, firstDayWeek, totalDays, prevMonthLastDay, getDayClass, getDayTitle };
+    }
+};
+
+const CustomHolidayManager = {
+    template: `<div class="card mb-0 admin-only text-xs"><h4 class="font-semibold mb-2 flex items-center gap-1">🗓️ 自訂放假</h4><div class="flex flex-col gap-2 mb-2"><div class="flex gap-2"><input type="date" v-model="singleDate" class="py-0.5 text-xs flex-1"><input type="text" v-model="holidayName" placeholder="名稱" class="py-0.5 text-xs flex-1"><button class="btn btn-green btn-sm" @click="addHoliday">加入</button></div></div><div class="flex flex-col gap-1 max-h-32 overflow-y-auto"><div v-for="(name, dateStr) in store.appData.customHolidays" :key="dateStr" class="flex justify-between items-center bg-green-50 dark:bg-green-950 p-1.5 rounded"><span>{{ dateStr }} ({{ name }})</span><button class="text-red-500 font-bold px-1" @click="deleteHoliday(dateStr)">&times;</button></div></div></div>`,
+    setup() {
+        const singleDate = ref(''); const holidayName = ref('');
+        function addHoliday() {
+            if (!singleDate.value || !holidayName.value.trim()) return;
+            store.saveStateSnapshot();
+            if (!store.appData.customHolidays) store.appData.customHolidays = {};
+            store.appData.customHolidays[singleDate.value] = holidayName.value.trim(); holidayName.value = '';
+        }
+        function deleteHoliday(dateStr) { store.saveStateSnapshot(); delete store.appData.customHolidays[dateStr]; }
+        return { store, singleDate, holidayName, addHoliday, deleteHoliday };
+    }
+};
+
+const StageManager = {
+    template: `<div class="card"><div class="flex justify-between items-center cursor-pointer select-none text-xs md:text-sm" @click="expanded = !expanded"><h3 class="font-semibold">🎨 工程階段一覽</h3><button class="text-xs px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded">▼ 展開/收折</button></div><div v-if="expanded" class="mt-2 border-t pt-2"><div class="flex gap-2 mb-2 admin-only text-xs"><input v-model="newStageName" placeholder="新階段名稱" class="flex-1 p-1"><button class="btn btn-blue btn-sm" @click="addStage">加入</button></div><div class="flex flex-wrap gap-2"><div v-for="(st, idx) in store.appData.stageList" :key="idx" class="stage-tag text-xs"><input type="color" v-model="st.color" class="color-picker-sm" @change="store.saveStateSnapshot()"><input type="text" v-model="st.name" class="text-xs p-0.5 w-20" @change="store.saveStateSnapshot()"><button class="text-red-500 font-bold px-1" @click="removeStage(idx)">&times;</button></div></div></div></div>`,
+    setup() {
+        const expanded = ref(false); const newStageName = ref('');
+        function addStage() {
+            if (!newStageName.value.trim()) return; store.saveStateSnapshot();
+            store.appData.stageList.push({ name: newStageName.value.trim(), color: '#2563eb' }); newStageName.value = '';
+        }
+        function removeStage(idx) { store.saveStateSnapshot(); store.appData.stageList.splice(idx, 1); }
+        return { store, expanded, newStageName, addStage, removeStage };
+    }
+};
+
+function checkCanComplete(task) {
+    if (task.checklists && task.checklists.length > 0) {
+        if (task.checklists.some(c => !c.isDone)) {
+            alert("⚠️ 必須完成所有子清單項目，才能將狀態設為「已完成」！");
+            return false;
+        }
+    }
+    return true;
+}
+
+const KanbanView = {
+    template: `
+        <div class="card">
+            <h3 class="font-semibold mb-3 text-sm">📌 看板模式 (Kanban View)</h3>
+            <div class="kanban-board">
+                <div v-for="col in columns" :key="col.status" class="kanban-col">
+                    <div class="font-bold text-xs mb-2 flex justify-between items-center">
+                        <span>{{ col.title }}</span>
+                        <span class="bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded-full text-[10px]">{{ getTasksByStatus(col.status).length }}</span>
+                    </div>
+                    <div v-for="task in getTasksByStatus(col.status)" :key="task.id" class="kanban-card text-xs">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-blue-600">{{ task.stage }}</span>
+                            <button class="btn btn-blue btn-sm text-[10px]" @click="$emit('edit-task', task.id)">✏️</button>
+                        </div>
+                        <div class="font-semibold text-sm my-1">{{ task.content }}</div>
+                        <div class="text-[10px] text-gray-500 mb-1 flex items-center justify-between">
+                            <span>🗓️ {{ task.start }} ~ {{ task.end }}</span>
+                            <span v-if="task.checklists && task.checklists.length>0" :class="{'text-green-600 font-bold': task.checklists.every(c=>c.isDone)}">
+                                ✅ {{ task.checklists.filter(c=>c.isDone).length }}/{{ task.checklists.length }}
+                            </span>
+                        </div>
+                        <select :value="task.status" class="w-full text-xs p-1 border rounded" @change="onStatusChange(task, $event)">
+                            <option value="未開始">未開始</option>
+                            <option value="進行中">進行中</option>
+                            <option value="已完成">已完成</option>
+                            <option value="已延期">已延期</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+    emits: ['edit-task'],
+    setup() {
+        const columns = [
+            { title: "⏳ 未開始", status: "未開始" }, { title: "▶️ 進行中", status: "進行中" },
+            { title: "✓ 已完成", status: "已完成" }, { title: "⚠️ 已延期", status: "已延期" }
+        ];
+        const tasks = computed(() => store.appData.projects[store.appData.currentProjectId]?.tasks || []);
+        function getTasksByStatus(status) { return tasks.value.filter(t => t.status === status); }
+        
+        function onStatusChange(task, event) {
+            const newStatus = event.target.value;
+            if (newStatus === '已完成' && !checkCanComplete(task)) {
+                event.target.value = task.status;
+                return;
+            }
+            store.saveStateSnapshot();
+            task.status = newStatus;
+        }
+
+        return { columns, getTasksByStatus, onStatusChange };
+    }
+};
+
+const TaskTable = {
+    template: `
+        <div class="card">
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                <div class="flex gap-2 admin-only">
+                    <button class="btn btn-green btn-sm" @click="addTask">+ 工序</button>
+                    <button class="btn btn-orange btn-sm" @click="addMilestone">🚩 里程碑</button>
+                </div>
+                <div class="flex items-center gap-1.5 text-xs">
+                    <input type="checkbox" id="excludeHolidaysCheck" v-model="store.appData.excludeHolidays" class="w-4 h-4">
+                    <label for="excludeHolidaysCheck" class="font-medium cursor-pointer">扣除週末假期</label>
+                </div>
+            </div>
+
+            <div class="desktop-table overflow-x-auto">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="admin-only">排</th><th>序</th><th>階段</th><th>內容</th><th>前置</th><th>開始</th>
+                            <th>結束</th><th>天</th><th>負責人</th><th>狀態</th><th class="admin-only">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(task, idx) in currentTasks" :key="task.id">
+                            <td class="admin-only"><button class="btn btn-gray btn-sm" @click="moveTask(idx, -1)">▲</button><button class="btn btn-gray btn-sm" @click="moveTask(idx, 1)">▼</button></td>
+                            <td>{{ idx + 1 }}</td>
+                            <td><select v-model="task.stage" class="text-xs p-1" @change="store.saveStateSnapshot()"><option v-for="s in store.appData.stageList" :key="s.name" :value="s.name">{{ s.name }}</option></select></td>
+                            <td><input v-model="task.content" class="text-xs p-1" @change="store.saveStateSnapshot()"></td>
+                            <td><span class="text-xs text-blue-600 font-bold" v-if="task.dependsOn">#{{ getTaskIndex(task.dependsOn) }}</span><span v-else class="text-gray-400">-</span></td>
+                            <td><input type="date" v-model="task.start" class="text-xs p-0.5" @change="onDateChange(task)"></td>
+                            <td><input type="date" v-model="task.end" class="text-xs p-0.5" @change="onDateChange(task)"></td>
+                            <td>{{ calcDay(task.start, task.end) }}</td>
+                            <td><select v-model="task.worker" class="text-xs p-1" @change="store.saveStateSnapshot()"><option value="">未指派</option><option v-for="w in store.appData.staffList" :value="w">{{ w }}</option></select></td>
+                            <td>
+                                <select :value="task.status" class="text-xs p-1" @change="onStatusChange(task, $event)">
+                                    <option value="未開始">未開始</option><option value="進行中">進行中</option>
+                                    <option value="已完成">已完成</option><option value="已延期">已延期</option>
+                                    <option value="里程碑">🚩</option>
+                                </select>
+                            </td>
+                            <td class="admin-only"><button class="btn btn-blue btn-sm" @click="$emit('edit-task', task.id)">✏️</button><button class="btn btn-red btn-sm" @click="removeTask(task.id)">&times;</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mobile-task-list">
+                <div v-for="(task, idx) in currentTasks" :key="'m_'+task.id" class="mobile-task-card">
+                    <div class="flex justify-between items-center mb-2 pb-1 border-b">
+                        <span class="font-bold text-xs bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">#{{ idx + 1 }} {{ task.stage }}</span>
+                        <div class="flex gap-1 admin-only">
+                            <button class="btn btn-blue btn-sm" @click="$emit('edit-task', task.id)">✏️</button>
+                            <button class="btn btn-red btn-sm" @click="removeTask(task.id)">&times;</button>
+                        </div>
+                    </div>
+                    <div class="font-semibold text-sm mb-1">{{ task.content }}</div>
+                    <div v-if="task.checklists && task.checklists.length>0" class="text-[10px] text-gray-500 mb-1">
+                        ✅ 子清單進度：{{ task.checklists.filter(c=>c.isDone).length }}/{{ task.checklists.length }}
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs mb-2">
+                        <div>起：<input type="date" v-model="task.start" class="p-1 w-full" @change="onDateChange(task)"></div>
+                        <div>止：<input type="date" v-model="task.end" class="p-1 w-full" @change="onDateChange(task)"></div>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                        <div>工期：<span class="font-bold text-blue-600">{{ calcDay(task.start, task.end) }}</span> 天</div>
+                        <select :value="task.status" class="p-1 text-xs" @change="onStatusChange(task, $event)">
+                            <option value="未開始">未開始</option><option value="進行中">進行中</option>
+                            <option value="已完成">已完成</option><option value="已延期">已延期</option><option value="里程碑">🚩</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+    emits: ['edit-task'],
+    setup(props, { emit }) {
+        const currentTasks = computed(() => store.appData.projects[store.appData.currentProjectId]?.tasks || []);
+        function getTaskIndex(id) { const idx = currentTasks.value.findIndex(t => t.id === id); return idx !== -1 ? idx + 1 : '?'; }
+
+        function addTask() {
+            if (!store.appData.currentProjectId) return alert("請選擇專案");
+            store.saveStateSnapshot();
+            store.appData.projects[store.appData.currentProjectId].tasks.push({
+                id: Date.now(), stage: store.appData.stageList[0]?.name || '',
+                content: '新工序任務', start: formatDate(new Date()), end: formatDate(new Date()),
+                worker: store.appData.staffList[0] || '', status: '未開始', remark: '', dependsOn: null, photos: [], checklists: []
+            });
+        }
+        function addMilestone() {
+            if (!store.appData.currentProjectId) return;
+            store.saveStateSnapshot();
+            store.appData.projects[store.appData.currentProjectId].tasks.push({
+                id: Date.now(), stage: store.appData.stageList[0]?.name || '', content: '🚩 里程碑節點',
+                start: formatDate(new Date()), end: formatDate(new Date()), status: '里程碑', checklists: []
+            });
+        }
+        function moveTask(idx, dir) {
+            store.saveStateSnapshot();
+            const arr = currentTasks.value; const target = idx + dir;
+            if (target < 0 || target >= arr.length) return;
+            const temp = arr[idx]; arr[idx] = arr[target]; arr[target] = temp;
+        }
+        function removeTask(id) {
+            store.saveStateSnapshot();
+            store.appData.projects[store.appData.currentProjectId].tasks = currentTasks.value.filter(t => t.id !== id);
+        }
+        function onDateChange(task) {
+            if (task.status === '里程碑') task.end = task.start;
+            store.saveStateSnapshot(); store.propagateTaskDates(currentTasks.value, task.id);
+        }
+        function onStatusChange(task, event) {
+            const newStatus = event.target.value;
+            if (newStatus === '已完成' && !checkCanComplete(task)) {
+                event.target.value = task.status;
+                return;
+            }
+            store.saveStateSnapshot();
+            task.status = newStatus;
+            if (task.status === '里程碑') task.end = task.start;
+        }
+        function calcDay(s, e) {
+            let cur = new Date(s); let end = new Date(e);
+            if (isNaN(cur) || isNaN(end) || cur > end) return 0;
+            if (!store.appData.excludeHolidays) return Math.ceil((end - cur) / (1000*60*60*24)) + 1;
+            let workDays = 0;
+            while (cur <= end) {
+                const w = cur.getDay(); const mdStr = `${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+                if (w !== 0 && w !== 6 && !store.appData.customHolidays?.[formatDate(cur)] && !getHolidayName(cur.getFullYear(), mdStr)) workDays++;
+                cur.setDate(cur.getDate() + 1);
+            }
+            return workDays;
+        }
+
+        return { store, currentTasks, getTaskIndex, addTask, addMilestone, moveTask, removeTask, onDateChange, onStatusChange, calcDay };
+    }
+};
+
+const GanttChart = {
+    props: ['customStart', 'customEnd', 'showCpm', 'showBaseline'],
+    template: `
+        <div class="card" id="ganttCardCard">
+            <div class="gantt-container" @mousemove="handleHover" @mouseleave="hoverIndex = -1">
+                <div class="gantt-wrap" :style="{ width: Math.max(850, labelWidth + totalDays * 34) + 'px' }">
+                    <div class="gantt-month-row"><div class="gantt-month-label-placeholder"></div>
+                        <div class="gantt-months-container"><div v-for="m in monthSpans" :key="m.ym" class="gantt-month-cell" :style="{ width: m.count * 34 + 'px' }">{{ m.ym }}</div></div>
+                    </div>
+                    <div class="gantt-header"><div class="gantt-task-label">工序任務</div>
+                        <div class="gantt-days-row"><div v-for="(day, i) in daysList" :key="i" :class="['gantt-day-cell', day.isWeekend ? 'gantt-day-weekend' : '']">{{ day.dateNum }}</div></div>
+                    </div>
+                    <div v-for="task in validTasks" :key="task.id" class="gantt-task-row">
+                        <div class="gantt-task-label" :title="task.stage">{{ task.content }}</div>
+                        <div class="gantt-bar-box">
+                            <div v-for="wIdx in weekendIndexes" class="gantt-weekend-column" :style="{ left: wIdx * 34 + 'px' }"></div>
+                            <div v-if="showBaseline && task.baselineStart && task.baselineEnd" class="gantt-baseline-bar" :style="{ left: getBaselinePos(task).left + 'px', width: getBaselinePos(task).width + 'px' }"></div>
+                            
+                            <div v-if="task.status === '里程碑'" :class="['gantt-milestone-wrapper', { 'is-dragging': activeDrag && activeDrag.taskId === task.id, 'is-critical': showCpm && criticalTaskIds.includes(task.id) }]" :style="{ left: getDynamicBarPos(task).left + 6 + 'px' }" @mousedown="startDrag($event, task, 'move')" @touchstart="startDrag($event, task, 'move')">
+                                <div class="gantt-milestone-diamond" :style="{ background: getStageColor(task.stage) }"></div><div class="gantt-milestone-text">🚩 {{ getPreviewText(task) }}</div>
+                            </div>
+
+                            <div v-else :class="['gantt-bar', getStatusClass(task.status), { 'is-dragging': activeDrag && activeDrag.taskId === task.id, 'is-critical': showCpm && criticalTaskIds.includes(task.id) }]" :style="{ left: getDynamicBarPos(task).left + 'px', width: getDynamicBarPos(task).width + 'px', background: getStageColor(task.stage) }">
+                                <div v-if="!store.isReadOnlyMode" class="gantt-handle" @mousedown.stop="startDrag($event, task, 'resize-left')" @touchstart.stop="startDrag($event, task, 'resize-left')"></div>
+                                <div class="gantt-bar-text" @mousedown.stop="startDrag($event, task, 'move')" @touchstart.stop="startDrag($event, task, 'move')">{{ getPreviewText(task) }}</div>
+                                <div v-if="!store.isReadOnlyMode" class="gantt-handle" @mousedown.stop="startDrag($event, task, 'resize-right')" @touchstart.stop="startDrag($event, task, 'resize-right')"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="hoverIndex >= 0" class="gantt-col-hover" :style="{ left: labelWidth + hoverIndex * 34 + 'px' }"></div>
+            </div>
+        </div>
+    `,
+    emits: ['edit-task'],
+    setup(props, { emit }) {
+        const hoverIndex = ref(-1); const activeDrag = ref(null);
+        const tasks = computed(() => store.appData.projects[store.appData.currentProjectId]?.tasks || []);
+        const validTasks = computed(() => tasks.value.filter(t => t.start && t.end));
+
+        const criticalTaskIds = computed(() => {
+            const taskList = validTasks.value; if (taskList.length === 0) return [];
+            let es = {}, ef = {};
+            taskList.forEach(t => {
+                let parentEf = 0;
+                if (t.dependsOn) { const p = taskList.find(x => x.id === t.dependsOn); if (p && ef[p.id] !== undefined) parentEf = ef[p.id]; }
+                const duration = Math.max(1, getDaysBetween(t.start, t.end) + 1);
+                es[t.id] = parentEf; ef[t.id] = es[t.id] + duration;
+            });
+            let maxProjectDuration = Math.max(...Object.values(ef), 0);
+            let lf = {}, ls = {};
+            taskList.slice().reverse().forEach(t => {
+                let children = taskList.filter(c => c.dependsOn === t.id);
+                let minChildLs = maxProjectDuration;
+                if (children.length > 0) minChildLs = Math.min(...children.map(c => ls[c.id]));
+                lf[t.id] = minChildLs;
+                const duration = Math.max(1, getDaysBetween(t.start, t.end) + 1);
+                ls[t.id] = lf[t.id] - duration;
+            });
+            return taskList.filter(t => (ls[t.id] - es[t.id]) === 0).map(t => t.id);
+        });
+
+        const minDate = computed(() => props.customStart ? new Date(props.customStart) : (validTasks.value.length === 0 ? new Date() : new Date(Math.min(...validTasks.value.map(t => new Date(t.start))))));
+        const maxDate = computed(() => props.customEnd ? new Date(props.customEnd) : (validTasks.value.length === 0 ? new Date() : new Date(Math.max(...validTasks.value.map(t => new Date(t.end))))));
+        const totalDays = computed(() => Math.max(1, Math.round((maxDate.value - minDate.value) / (1000*60*60*24)) + 1));
+        const labelWidth = computed(() => window.innerWidth < 768 ? 160 : 200);
+
+        const monthSpans = computed(() => {
+            let spans = []; let cur = new Date(minDate.value); let curYM = "";
+            for (let i = 0; i < totalDays.value; i++) {
+                let ym = `${cur.getFullYear()}年${String(cur.getMonth()+1).padStart(2,'0')}月`;
+                if (ym !== curYM) { spans.push({ ym, count: 1 }); curYM = ym; } else { spans[spans.length - 1].count++; }
+                cur.setDate(cur.getDate() + 1);
+            }
+            return spans;
+        });
+        const daysList = computed(() => {
+            let list = []; let cur = new Date(minDate.value);
+            for (let i = 0; i < totalDays.value; i++) { list.push({ dateNum: cur.getDate(), isWeekend: cur.getDay() === 0 || cur.getDay() === 6 }); cur.setDate(cur.getDate() + 1); }
+            return list;
+        });
+        const weekendIndexes = computed(() => {
+            let idxs = []; let cur = new Date(minDate.value);
+            for (let i = 0; i < totalDays.value; i++) { if (cur.getDay() % 6 === 0) idxs.push(i); cur.setDate(cur.getDate() + 1); }
+            return idxs;
+        });
+
+        function getBaselinePos(task) {
+            const s = new Date(task.baselineStart); const e = new Date(task.baselineEnd);
+            let left = Math.round((s - minDate.value) / (1000*60*60*24)) * 34;
+            let width = (Math.round((e - s) / (1000*60*60*24)) + 1) * 34;
+            return { left: Math.max(0, left), width: Math.max(0, width) };
+        }
+
+        function getDynamicBarPos(task) {
+            let startStr = task.start; let endStr = task.end;
+            if (activeDrag.value && activeDrag.value.taskId === task.id) { startStr = activeDrag.value.tempStart; endStr = activeDrag.value.tempEnd; }
+            const s = new Date(startStr); const e = new Date(endStr);
+            let left = Math.round((s - minDate.value) / (1000*60*60*24)) * 34;
+            let width = (Math.round((e - s) / (1000*60*60*24)) + 1) * 34;
+            return { left: Math.max(0, left), width: Math.max(0, width) };
+        }
+
+        function getStageColor(stageName) { return store.appData.stageList.find(s => s.name === stageName)?.color || '#666'; }
+        function getStatusClass(status) { if (status === '已完成') return 'status-done'; if (status === '進行中') return 'status-doing'; if (status === '未開始') return 'status-notstart'; return ''; }
+        function getPreviewText(task) {
+            let chkStr = (task.checklists && task.checklists.length>0) ? ` [✅${task.checklists.filter(c=>c.isDone).length}/${task.checklists.length}]` : '';
+            if (activeDrag.value && activeDrag.value.taskId === task.id) return `[${activeDrag.value.tempStart} ~ ${activeDrag.value.tempEnd}] ${task.content}${chkStr}`;
+            return `${task.content} - ${task.status}${chkStr}`;
+        }
+
+        function handleHover(e) {
+            if (activeDrag.value) return;
+            const rect = e.currentTarget.getBoundingClientRect(); const mouseX = e.clientX - rect.left;
+            if (mouseX >= labelWidth.value) hoverIndex.value = Math.floor((mouseX - labelWidth.value) / 34); else hoverIndex.value = -1;
+        }
+
+        function startDrag(e, task, type) {
+            if (store.isReadOnlyMode) return;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            activeDrag.value = { taskId: task.id, type, startX: clientX, origStart: task.start, origEnd: task.end, tempStart: task.start, tempEnd: task.end, moved: false };
+
+            const onMove = (me) => {
+                if (!activeDrag.value) return;
+                const curX = me.touches ? me.touches[0].clientX : me.clientX; const deltaX = curX - activeDrag.value.startX;
+                if (Math.abs(deltaX) > 3) activeDrag.value.moved = true;
+                const daysDelta = Math.round(deltaX / 34);
+                let dStart = new Date(activeDrag.value.origStart); let dEnd = new Date(activeDrag.value.origEnd);
+                if (type === 'move') { dStart.setDate(dStart.getDate() + daysDelta); dEnd.setDate(dEnd.getDate() + daysDelta); }
+                else if (type === 'resize-left') { dStart.setDate(dStart.getDate() + daysDelta); if (dStart > dEnd) dStart = new Date(dEnd); }
+                else if (type === 'resize-right') { dEnd.setDate(dEnd.getDate() + daysDelta); if (dEnd < dStart) dEnd = new Date(dStart); }
+                activeDrag.value.tempStart = formatDate(dStart); activeDrag.value.tempEnd = formatDate(dEnd);
+            };
+
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp);
+                window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onUp);
+                if (activeDrag.value) {
+                    if (!activeDrag.value.moved) emit('edit-task', task.id);
+                    else {
+                        store.saveStateSnapshot(); task.start = activeDrag.value.tempStart; task.end = activeDrag.value.tempEnd;
+                        store.propagateTaskDates(tasks.value, task.id);
+                    }
+                    activeDrag.value = null;
+                }
+            };
+            window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+            window.addEventListener('touchmove', onMove, { passive: true }); window.addEventListener('touchend', onUp);
+        }
+
+        return { store, validTasks, totalDays, labelWidth, monthSpans, daysList, weekendIndexes, criticalTaskIds, hoverIndex, activeDrag, getBaselinePos, getDynamicBarPos, getStageColor, getStatusClass, getPreviewText, handleHover, startDrag };
+    }
+};
+
+const app = createApp({
+    setup() {
+        const currentView = ref('gantt'); 
+        const showCPM = ref(false); const showBaseline = ref(true);
+
+        const newProjectName = ref(''); const showLoginModal = ref(false); const loginPasswordInput = ref(''); const loginError = ref(false);
+        const showEditTaskModal = ref(false); const editingTask = ref(null); const newChecklistItemText = ref('');
+        const showSettingsModal = ref(false); const showChangelogModal = ref(false);
+        const showSiteLogsModal = ref(false); const showMobileSidebar = ref(false);
+        
+        const showMaterialModal = ref(false);
+        const newMaterial = reactive({ name: '', expectedDate: formatDate(new Date()), status: '待訂購', note: '' });
+
+        const isDesktop = ref(window.innerWidth >= 768);
+        const customGanttStart = ref(''); const customGanttEnd = ref(''); const previewImgUrl = ref(null);
+
+        const changelogList = ref([
+            {
+                version: "V1.8.0", date: "2026-07-23",
+                changes: [
+                    "✅ 新增「驗收子清單 (Checklist)」，強制全數勾選才能將工序改為已完成",
+                    "📦 新增「主材進場時間追蹤」功能，紀錄磁磚/衛浴等預計到場日與狀態"
+                ]
+            },
+            {
+                version: "V1.7.0", date: "2026-07-23",
+                changes: ["🔗 引入 Finish-to-Start 前置任務依賴鏈", "📐 新增鎖定基準線 (Baseline)", "🔥 新增 CPM 關鍵路徑演算法", "📌 新增 Kanban 看板視圖"]
+            }
+        ]);
+
+        const currentTasks = computed(() => store.appData.projects[store.appData.currentProjectId]?.tasks || []);
+        const currentMaterials = computed(() => {
+            const pid = store.appData.currentProjectId;
+            if (!store.appData.projects[pid]) return [];
+            if (!store.appData.projects[pid].materials) store.appData.projects[pid].materials = [];
+            return store.appData.projects[pid].materials;
+        });
+
+        const possibleParents = computed(() => {
+            if (!editingTask.value) return [];
+            return currentTasks.value.filter(t => t.id !== editingTask.value.id);
+        });
+        function getTaskIndex(id) { const idx = currentTasks.value.findIndex(t => t.id === id); return idx !== -1 ? idx + 1 : '?'; }
+
+        const progressPercent = computed(() => {
+            if (currentTasks.value.length === 0) return 0;
+            const done = currentTasks.value.filter(t => t.status === '已完成').length;
+            return Math.round((done / currentTasks.value.length) * 100);
+        });
+        const totalDayCount = computed(() => {
+            const valid = currentTasks.value.filter(t => t.start && t.end);
+            if (valid.length === 0) return 0;
+            const minS = new Date(Math.min(...valid.map(t => new Date(t.start))));
+            const maxE = new Date(Math.max(...valid.map(t => new Date(t.end))));
+            return Math.ceil((maxE - minS) / (1000*60*60*24)) + 1;
+        });
+
+        onMounted(() => {
+            window.addEventListener('resize', () => isDesktop.value = window.innerWidth >= 768);
+            const urlParams = new URLSearchParams(window.location.search);
+            const viewId = urlParams.get('view');
+            if (viewId) store.isReadOnlyMode = true;
+
+            cloudRef.on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) { store.appData = Object.assign(store.appData, data); store.cloudConnected = true; }
+                if (store.appData.loginPassword && sessionStorage.getItem('isAuthenticated') !== 'true') showLoginModal.value = true;
+                if (viewId && store.appData.projects[viewId]) store.appData.currentProjectId = viewId;
+                store.applyTheme(); store.applyFontSize();
+            });
+        });
+
+        function addMaterial() {
+            if (!newMaterial.name.trim()) return alert("請輸入主材名稱");
+            store.saveStateSnapshot();
+            const pid = store.appData.currentProjectId;
+            if (!store.appData.projects[pid].materials) store.appData.projects[pid].materials = [];
+            store.appData.projects[pid].materials.push({
+                id: Date.now(), name: newMaterial.name.trim(), expectedDate: newMaterial.expectedDate, status: newMaterial.status, note: newMaterial.note.trim()
+            });
+            newMaterial.name = ''; newMaterial.note = '';
+        }
+        function removeMaterial(id) {
+            store.saveStateSnapshot();
+            store.appData.projects[store.appData.currentProjectId].materials = currentMaterials.value.filter(m => m.id !== id);
+        }
+
+        function openEditTaskModal(taskId) {
+            const task = currentTasks.value.find(t => t.id === taskId);
+            if (task) {
+                editingTask.value = JSON.parse(JSON.stringify(task));
+                if (!editingTask.value.checklists) editingTask.value.checklists = [];
+                showEditTaskModal.value = true;
+            }
+        }
+        function addChecklistItem() {
+            if (!newChecklistItemText.value.trim()) return;
+            editingTask.value.checklists.push({ id: Date.now(), text: newChecklistItemText.value.trim(), isDone: false });
+            newChecklistItemText.value = '';
+        }
+        function removeChecklistItem(idx) { editingTask.value.checklists.splice(idx, 1); }
+        
+        function handleEditTaskStatusChange(newStatus) {
+            if (newStatus === '已完成' && !checkCanComplete(editingTask.value)) {
+                editingTask.value.status = '進行中';
+                return;
+            }
+            editingTask.value.status = newStatus;
+        }
+
+        function saveTaskChanges() {
+            if (editingTask.value.status === '已完成' && !checkCanComplete(editingTask.value)) {
+                editingTask.value.status = '進行中';
+                return;
+            }
+            store.saveStateSnapshot();
+            const pid = store.appData.currentProjectId;
+            const idx = store.appData.projects[pid].tasks.findIndex(t => t.id === editingTask.value.id);
+            if (idx !== -1) {
+                store.appData.projects[pid].tasks[idx] = editingTask.value;
+                store.propagateTaskDates(store.appData.projects[pid].tasks, editingTask.value.id);
+            }
+            showEditTaskModal.value = false;
+        }
+        function cancelTaskEdit() { showEditTaskModal.value = false; newChecklistItemText.value = ''; }
+
+        function verifyLogin() {
+            if (loginPasswordInput.value === store.appData.loginPassword) {
+                sessionStorage.setItem('isAuthenticated', 'true');
+                showLoginModal.value = false; loginError.value = false;
+            } else loginError.value = true;
+        }
+        function addNewProject() {
+            if (!newProjectName.value.trim()) return alert("請輸入名稱");
+            store.saveStateSnapshot(); const pid = 'proj_' + Date.now();
+            store.appData.projectList.push(pid);
+            store.appData.projects[pid] = { name: newProjectName.value.trim(), tasks: [], siteLogs: [], materials: [] };
+            store.appData.currentProjectId = pid; newProjectName.value = '';
+        }
+        function deleteCurrentProject() {
+            if (!store.appData.currentProjectId || !confirm("確定刪除此專案？")) return;
+            store.saveStateSnapshot();
+            store.appData.projectList = store.appData.projectList.filter(p => p !== store.appData.currentProjectId);
+            delete store.appData.projects[store.appData.currentProjectId];
+            store.appData.currentProjectId = store.appData.projectList[0] || null;
+        }
+        function saveBaseline() {
+            if (!store.appData.currentProjectId) return alert("請選擇專案");
+            if (confirm("鎖定「初始基準線 (Baseline)」？")) {
+                store.saveStateSnapshot();
+                currentTasks.value.forEach(t => { t.baselineStart = t.start; t.baselineEnd = t.end; });
+                alert("📐 基準線鎖定成功！");
+            }
+        }
+        function resetGanttDates() { customGanttStart.value = ''; customGanttEnd.value = ''; }
+        function copyClientShareLink() {
+            if (!store.appData.currentProjectId) return alert("請選擇專案");
+            const url = `${window.location.origin}${window.location.pathname}?view=${store.appData.currentProjectId}`;
+            navigator.clipboard.writeText(url).then(() => alert(`✅ 連結已複製：\n${url}`));
+        }
+        function previewImage(url) { previewImgUrl.value = url; }
+
+        return {
+            store, currentView, showCPM, showBaseline, newProjectName, showLoginModal, loginPasswordInput, loginError,
+            showEditTaskModal, editingTask, newChecklistItemText, possibleParents, getTaskIndex,
+            showSettingsModal, showChangelogModal, showSiteLogsModal, showMaterialModal, showMobileSidebar, isDesktop,
+            customGanttStart, customGanttEnd, previewImgUrl, changelogList, currentMaterials, newMaterial,
+            progressPercent, totalDayCount, verifyLogin, copyClientShareLink, addNewProject, deleteCurrentProject,
+            saveBaseline, openEditTaskModal, handleEditTaskStatusChange, saveTaskChanges, cancelTaskEdit,
+            addChecklistItem, removeChecklistItem, addMaterial, removeMaterial, resetGanttDates, previewImage
+        };
+    }
+});
+
+app.component('mini-calendar', MiniCalendar);
+app.component('custom-holiday-manager', CustomHolidayManager);
+app.component('stage-manager', StageManager);
+app.component('task-table', TaskTable);
+app.component('gantt-chart', GanttChart);
+app.component('kanban-view', KanbanView);
+
+app.mount('#app');
+</script>
+</body>
+</html>
+
