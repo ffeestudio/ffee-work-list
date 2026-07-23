@@ -1,5 +1,10 @@
 import { createApp, ref, reactive, computed, onMounted } from 'vue';
 
+// 透過 NPM 模組導入 Firebase，確保 Vite 打包時不崩潰
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/database';
+import 'firebase/compat/storage';
+
 // Firebase 初始化配置
 const firebaseConfig = {
   apiKey: "8k51yPMqdWNUOMGw60bkRgRfBL3IfrnUbIZgGW9L",
@@ -335,9 +340,14 @@ const app = createApp({
     const currentProjectName = computed(() => store.appData.projects[store.appData.currentProjectId]?.name || '');
 
     onMounted(() => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const viewId = urlParams.get('view');
+      if (viewId) store.isReadOnlyMode = true;
+
       cloudRef.on('value', (snapshot) => {
         const data = snapshot.val();
         if (data) { store.appData = Object.assign(store.appData, data); store.cloudConnected = true; }
+        if (viewId && store.appData.projects[viewId]) store.appData.currentProjectId = viewId;
         store.applyTheme();
       });
     });
