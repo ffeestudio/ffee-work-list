@@ -3,16 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>FFEE Studio - 室內設計工程進度管理系統</title>
-  <link rel="icon" href="./favicon.ico">
+  <title>FFEE Studio - 室內設計工程進度管理系統 V2.0</title>
+  
+  <!-- Tailwind CSS & Google Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Firebase SDK (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 </head>
 <body class="font-size-md">
 
-  <!-- Vue 3 應用程式掛載節點 -->
   <div id="app"></div>
 
-  <!-- Vite 模組入口 (使用相對路徑) -->
-  <script type="module" src="./src/main.js"></script>
+  <!-- Vite 模組入口 -->
+  <script type="module" src="/src/main.js"></script>
 
 </body>
 </html>
