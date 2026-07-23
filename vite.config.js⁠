@@ -3,9 +3,10 @@ import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/ffee-work-list/',
+  base: '/ffee-work-list/', // 確保 GitHub Pages 網址路徑正確
   build: {
     outDir: 'dist'
   }
 });
+
 
