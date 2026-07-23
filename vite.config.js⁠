@@ -1,9 +1,17 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import path from 'path';
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/ffee-work-list/', // ⚠️ 必須與 GitHub 儲存庫名稱一致
+  base: '/ffee-work-list/', // ⚠️ 必須與 GitHub 儲存庫名稱完全相同
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      // 💡 關鍵修復：啟用含 Template Compiler 的 Vue 模組，解決 createApp({ template }) 白畫面問題
+      'vue': 'vue/dist/vue.esm-bundler.js'
+    }
+  },
   build: {
     outDir: 'dist'
   }
