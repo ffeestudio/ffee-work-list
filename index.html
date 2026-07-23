@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>FFEE Studio - 室內設計工程進度管理系統 V1.9.3</title>
+<title>FFEE Studio - 室內設計工程進度管理系統 V1.9.4</title>
 
 <!-- Tailwind CSS -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -194,7 +194,7 @@ input:focus, select:focus, textarea:focus {
 .gantt-bar-text { flex: 1; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; white-space: nowrap; font-weight: 500; }
 .gantt-handle { width: 12px; height: 100%; background: rgba(255,255,255,0.3); cursor: ew-resize; flex-shrink: 0; }
 
-/* 迷你月曆 */
+/* 迷你月曆與放假樣式 🗓️ */
 .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 6px; }
 .calendar-week-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
 .calendar-week-label { text-align: center; font-size: 12px; font-weight: 600; color: var(--text-muted); }
@@ -208,8 +208,9 @@ body.dark-mode .cal-custom-holiday { background: #14532d; color: #dcfce7; }
 .cal-today { border: 2px solid #2563eb; font-weight: bold; }
 .cal-other-month { color: var(--text-muted); opacity: 0.4; }
 
-.stage-tag { display: flex; align-items: center; gap: 6px; background: var(--table-header-bg); padding: 4px 8px; border-radius: 6px; }
-.color-picker-sm { width: 28px; height: 28px; border: none; cursor: pointer; border-radius: 4px; }
+/* 階段調色盤 🎨 */
+.stage-tag { display: flex; align-items: center; gap: 6px; background: var(--table-header-bg); padding: 4px 8px; border-radius: 8px; border: 1px solid var(--border-color); }
+.color-picker-sm { width: 28px; height: 28px; border: none; cursor: pointer; border-radius: 6px; background: transparent; }
 
 /* 看板 Kanban */
 .kanban-board { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 12px; }
@@ -268,7 +269,6 @@ body.readonly-mode .admin-only { display: none !important; }
 <body class="font-size-md">
 
 <div id="app">
-    <!-- 隱藏檔案匯入用 -->
     <input type="file" ref="fileInput" accept=".json" class="hidden admin-only" @change="handleFileImport">
 
     <!-- 頂部 Header & Navigation Bar -->
@@ -279,7 +279,7 @@ body.readonly-mode .admin-only { display: none !important; }
             </div>
             <div>
                 <h1 class="font-bold text-base md:text-lg leading-tight">FFEE Studio 工程管理系統</h1>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">室內設計排期與現場日誌系統 V1.9.3</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">室內設計排期與現場日誌系統 V1.9.4</p>
             </div>
         </div>
 
@@ -317,6 +317,7 @@ body.readonly-mode .admin-only { display: none !important; }
                 </span>
             </div>
 
+            <!-- 月曆組件 (含香港假期與自訂放假) -->
             <mini-calendar></mini-calendar>
 
             <div class="card mb-0 admin-only">
@@ -329,6 +330,7 @@ body.readonly-mode .admin-only { display: none !important; }
                 </select>
             </div>
 
+            <!-- 自訂假期管理組件 🗓️ -->
             <custom-holiday-manager></custom-holiday-manager>
         </div>
 
@@ -399,8 +401,10 @@ body.readonly-mode .admin-only { display: none !important; }
             <!-- 看板 View -->
             <kanban-view v-if="currentView === 'kanban'" @edit-task="openEditTaskModal"></kanban-view>
 
-            <!-- 階段與工序清單（支援上下拖拽排序 ☰） -->
+            <!-- 施工階段調色盤 (可展開自訂新增/調色) 🎨 -->
             <stage-manager></stage-manager>
+
+            <!-- 工序任務表格 (包含扣除假期與拖拽排序) -->
             <task-table @edit-task="openEditTaskModal"></task-table>
         </div>
     </div>
@@ -643,6 +647,19 @@ const db = firebase.database();
 const storage = firebase.storage();
 const cloudRef = db.ref('decorScheduleData');
 
+// 🇭🇰 香港公眾假期庫
+const fixedHolidays = { "01-01":"元旦", "05-01":"勞動節", "07-01":"香港特區成立紀念日", "10-01":"國慶日", "12-25":"聖誕節", "12-26":"聖誕節翌日" };
+const dynamicHolidaysByYear = {
+    "2024": { "02-10":"農曆年初一", "02-12":"農曆年初三", "03-29":"耶穌受難節", "04-01":"復活節", "04-04":"清明節", "05-15":"佛誕", "06-10":"端午節", "09-18":"中秋節翌日", "10-11":"重陽節" },
+    "2025": { "01-29":"農曆年初一", "01-30":"農曆年初二", "04-04":"清明節", "04-18":"耶穌受難節", "05-05":"佛誕", "05-31":"端午節", "10-07":"中秋節翌日", "10-29":"重陽節" },
+    "2026": { "02-17":"農曆年初一", "02-18":"農曆年初二", "04-03":"耶穌受難節", "04-06":"復活節", "05-25":"佛誕翌日", "06-19":"端午節", "09-26":"中秋節翌日", "10-19":"重陽節翌日" }
+};
+
+function getHolidayName(year, monthDayStr) {
+    if (dynamicHolidaysByYear[year]?.[monthDayStr]) return dynamicHolidaysByYear[year][monthDayStr];
+    return fixedHolidays[monthDayStr] || null;
+}
+
 function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function getDaysBetween(sStr, eStr) { return Math.round((new Date(eStr) - new Date(sStr)) / (1000 * 60 * 60 * 24)); }
 function addDaysStr(dateStr, days) { let d = new Date(dateStr); d.setDate(d.getDate() + days); return formatDate(d); }
@@ -691,23 +708,171 @@ const store = reactive({
     }
 });
 
+/* 🗓️ 迷你月曆組件 (含公眾假期與自訂放假) */
 const MiniCalendar = {
-    template: `<div class="card mb-0 text-xs"><h3 class="font-bold mb-2">工程排期月曆</h3><div class="calendar-header"><select v-model="year" class="p-1 text-xs border rounded"><option v-for="y in 6" :value="2023+y">{{ 2023+y }}年</option></select><select v-model="month" class="p-1 text-xs border rounded"><option v-for="m in 12" :value="m-1">{{ m }}月</option></select></div><div class="calendar-week-row"><div v-for="w in ['日','一','二','三','四','五','六']" class="calendar-week-label">{{ w }}</div></div><div class="calendar-day-grid"><div v-for="d in totalDays" class="cal-day">{{ d }}</div></div></div>`,
+    template: `
+        <div class="card mb-0 text-xs">
+            <h3 class="font-bold mb-2">工程排期月曆</h3>
+            <div class="calendar-header">
+                <select v-model="year" class="p-1 text-xs border rounded"><option v-for="y in 8" :key="y" :value="2022+y">{{ 2022+y }}年</option></select>
+                <select v-model="month" class="p-1 text-xs border rounded"><option v-for="m in 12" :key="m" :value="m-1">{{ m }}月</option></select>
+            </div>
+            <div class="calendar-week-row">
+                <div v-for="w in ['日','一','二','三','四','五','六']" :key="w" class="calendar-week-label">{{ w }}</div>
+            </div>
+            <div class="calendar-day-grid">
+                <div v-for="p in firstDayWeek" :key="'p'+p" class="cal-day cal-other-month">{{ prevMonthLastDay - firstDayWeek + p }}</div>
+                <div v-for="d in totalDays" :key="'d'+d" :class="getDayClass(d)" :title="getDayTitle(d)" class="cal-day">{{ d }}</div>
+            </div>
+            <div class="mt-2.5 text-[11px] opacity-80 space-y-0.5 border-t pt-2">
+                <div>🔴 淺紅：週六日休息</div>
+                <div>🟠 橙色：香港公眾假期</div>
+                <div>🟢 綠色：自訂放假日子</div>
+            </div>
+        </div>
+    `,
     setup() {
-        const year = ref(new Date().getFullYear()); const month = ref(new Date().getMonth());
+        const year = ref(new Date().getFullYear()); const month = ref(new Date().getMonth()); const today = new Date();
+        const firstDayWeek = computed(() => new Date(year.value, month.value, 1).getDay());
         const totalDays = computed(() => new Date(year.value, month.value + 1, 0).getDate());
-        return { year, month, totalDays };
+        const prevMonthLastDay = computed(() => new Date(year.value, month.value, 0).getDate());
+
+        function getDayClass(d) {
+            const monthDayStr = `${String(month.value+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const fullDateStr = `${year.value}-${monthDayStr}`;
+            const isToday = year.value === today.getFullYear() && month.value === today.getMonth() && d === today.getDate();
+            
+            if (store.appData.customHolidays?.[fullDateStr]) return ['cal-custom-holiday', isToday ? 'cal-today' : ''];
+            if (getHolidayName(year.value, monthDayStr)) return ['cal-holiday', isToday ? 'cal-today' : ''];
+            if (new Date(year.value, month.value, d).getDay() % 6 === 0) return ['cal-weekend', isToday ? 'cal-today' : ''];
+            return [isToday ? 'cal-today' : ''];
+        }
+
+        function getDayTitle(d) {
+            const monthDayStr = `${String(month.value+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const fullDateStr = `${year.value}-${monthDayStr}`;
+            return store.appData.customHolidays?.[fullDateStr] || getHolidayName(year.value, monthDayStr) || '';
+        }
+
+        return { year, month, firstDayWeek, totalDays, prevMonthLastDay, getDayClass, getDayTitle };
     }
 };
 
+/* 🗓️ 自訂放假管理組件 */
 const CustomHolidayManager = {
-    template: `<div class="card mb-0 admin-only text-xs"><h4 class="font-bold mb-2">🗓️ 自訂放假管理</h4><div class="flex gap-2"><input type="date" v-model="d" class="p-1 text-xs flex-1"><button class="btn-pill bg-emerald-600 text-white text-xs" @click="add">新增</button></div></div>`,
-    setup() { const d = ref(''); function add() { if (d.value) { store.saveStateSnapshot(); store.appData.customHolidays[d.value] = '休假'; d.value = ''; } } return { d, add }; }
+    template: `
+        <div class="card mb-0 admin-only text-xs">
+            <h4 class="font-bold mb-2 flex items-center gap-1">🗓️ 自訂放假管理</h4>
+            <div class="flex flex-col gap-2 mb-2">
+                <div class="flex gap-2 text-[11px] mb-1">
+                    <label class="flex items-center gap-1 cursor-pointer"><input type="radio" v-model="mode" value="single" class="accent-indigo-600"> 單日</label>
+                    <label class="flex items-center gap-1 cursor-pointer"><input type="radio" v-model="mode" value="range" class="accent-indigo-600"> 日期範圍</label>
+                </div>
+                <div v-if="mode === 'single'">
+                    <input type="date" v-model="singleDate" class="w-full text-xs p-1">
+                </div>
+                <div v-else class="flex flex-col gap-1">
+                    <input type="date" v-model="startDate" class="text-xs p-1" placeholder="開始日期">
+                    <input type="date" v-model="endDate" class="text-xs p-1" placeholder="結束日期">
+                </div>
+                <div class="flex gap-2 mt-1">
+                    <input type="text" v-model="holidayName" placeholder="如: 農曆假" class="text-xs p-1 flex-1">
+                    <button class="btn-pill bg-emerald-600 text-white text-xs px-3" @click="addHoliday">加入</button>
+                </div>
+            </div>
+            <div class="flex flex-col gap-1 max-h-36 overflow-y-auto">
+                <div v-for="(name, dateStr) in store.appData.customHolidays" :key="dateStr" class="flex justify-between items-center bg-emerald-50 dark:bg-emerald-950/60 p-1.5 rounded-lg border border-emerald-100 dark:border-emerald-800">
+                    <div>
+                        <div class="font-bold text-emerald-800 dark:text-emerald-300">{{ dateStr }}</div>
+                        <div class="text-[10px] opacity-75">{{ name }}</div>
+                    </div>
+                    <button class="text-rose-500 font-bold px-1.5 text-base" @click="deleteHoliday(dateStr)">&times;</button>
+                </div>
+            </div>
+        </div>
+    `,
+    setup() {
+        const mode = ref('single');
+        const singleDate = ref('');
+        const startDate = ref('');
+        const endDate = ref('');
+        const holidayName = ref('');
+
+        function addHoliday() {
+            if (!holidayName.value.trim()) return alert("請填寫假期名稱");
+            store.saveStateSnapshot();
+            if (!store.appData.customHolidays) store.appData.customHolidays = {};
+
+            if (mode.value === 'single') {
+                if (!singleDate.value) return alert("請選擇日期");
+                store.appData.customHolidays[singleDate.value] = holidayName.value.trim();
+            } else {
+                if (!startDate.value || !endDate.value) return alert("請選擇開始與結束日期");
+                let cur = new Date(startDate.value);
+                let end = new Date(endDate.value);
+                while (cur <= end) {
+                    store.appData.customHolidays[formatDate(cur)] = holidayName.value.trim();
+                    cur.setDate(cur.getDate() + 1);
+                }
+            }
+            holidayName.value = '';
+        }
+
+        function deleteHoliday(dateStr) {
+            store.saveStateSnapshot();
+            delete store.appData.customHolidays[dateStr];
+        }
+
+        return { store, mode, singleDate, startDate, endDate, holidayName, addHoliday, deleteHoliday };
+    }
 };
 
+/* 🎨 施工階段調色盤與階段管理組件 */
 const StageManager = {
-    template: `<div class="card"><h3 class="font-bold text-xs mb-2">🎨 施工階段調色盤</h3><div class="flex flex-wrap gap-2"><div v-for="st in store.appData.stageList" :key="st.name" class="stage-tag text-xs font-semibold"><span class="w-3 h-3 rounded-full" :style="{background: st.color}"></span>{{ st.name }}</div></div></div>`,
-    setup() { return { store }; }
+    template: `
+        <div class="card">
+            <div class="flex justify-between items-center cursor-pointer select-none text-xs md:text-sm" @click="expanded = !expanded">
+                <h3 class="font-bold flex items-center gap-2">
+                    <span>🎨 施工階段調色盤</span>
+                    <span class="text-[11px] text-slate-400 font-normal">(點擊可展開編輯與增加階段)</span>
+                </h3>
+                <button class="text-xs px-2.5 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg border font-semibold">
+                    {{ expanded ? '▲ 收折' : '▼ 展開' }}
+                </button>
+            </div>
+            <div v-if="expanded" class="mt-3 border-t pt-3 border-slate-100 dark:border-slate-800">
+                <div class="flex gap-2 mb-3 admin-only text-xs">
+                    <input v-model="newStageName" placeholder="輸入新階段名稱" class="flex-1 p-1.5">
+                    <button class="btn-pill bg-indigo-600 text-white text-xs px-3" @click="addStage">加入階段</button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <div v-for="(st, idx) in store.appData.stageList" :key="idx" class="stage-tag text-xs font-semibold">
+                        <input type="color" v-model="st.color" class="color-picker-sm" @change="store.saveStateSnapshot()">
+                        <input type="text" v-model="st.name" class="text-xs p-1 w-24 bg-transparent" @change="store.saveStateSnapshot()">
+                        <button class="text-rose-500 font-bold px-1" @click="removeStage(idx)">&times;</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `,
+    setup() {
+        const expanded = ref(false);
+        const newStageName = ref('');
+
+        function addStage() {
+            if (!newStageName.value.trim()) return;
+            store.saveStateSnapshot();
+            store.appData.stageList.push({ name: newStageName.value.trim(), color: '#4f46e5' });
+            newStageName.value = '';
+        }
+
+        function removeStage(idx) {
+            store.saveStateSnapshot();
+            store.appData.stageList.splice(idx, 1);
+        }
+
+        return { store, expanded, newStageName, addStage, removeStage };
+    }
 };
 
 function checkCanComplete(task) {
@@ -760,18 +925,26 @@ const KanbanView = {
     }
 };
 
-/* 🌟 工序任務表格（包含 HTML5 + Touch 拖拽排序功能 ☰） */
+/* 🌟 工序任務表格（含扣除假期天數計算與拖拽排序 ☰） */
 const TaskTable = {
     template: `
         <div class="card">
-            <div class="flex justify-between items-center mb-3">
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-3">
                 <div class="flex items-center gap-2">
                     <button class="btn-pill bg-emerald-600 text-white text-xs admin-only" @click="addTask">+ 新增工序</button>
-                    <span class="text-xs text-slate-400 hidden sm:inline">💡 按住抓手 ☰ 可直接上下拖動調整工序順序</span>
+                    <span class="text-xs text-slate-400 hidden sm:inline">💡 按住抓手 ☰ 可上下拖動調整排序</span>
+                </div>
+
+                <!-- ⏸️ 扣除假期與週末選項 -->
+                <div class="flex items-center gap-2 bg-indigo-50/60 dark:bg-slate-800 p-2 rounded-xl border border-indigo-100/50 dark:border-slate-700">
+                    <input type="checkbox" id="excludeHolidaysCheck" v-model="store.appData.excludeHolidays" class="w-4 h-4 accent-indigo-600 cursor-pointer">
+                    <label for="excludeHolidaysCheck" class="text-xs font-bold text-indigo-900 dark:text-indigo-300 cursor-pointer select-none">
+                        工期自動扣除星期六、日及公眾假期
+                    </label>
                 </div>
             </div>
 
-            <!-- 桌面端表格 (Drag & Drop) -->
+            <!-- 桌面端表格 -->
             <div class="desktop-table overflow-x-auto">
                 <table>
                     <thead>
@@ -783,6 +956,7 @@ const TaskTable = {
                             <th>前置</th>
                             <th>開始日期</th>
                             <th>結束日期</th>
+                            <th>天數</th>
                             <th class="admin-only">操作</th>
                         </tr>
                     </thead>
@@ -811,6 +985,7 @@ const TaskTable = {
                             </td>
                             <td><input type="date" v-model="task.start" class="text-xs p-1" @change="onDateChange(task)"></td>
                             <td><input type="date" v-model="task.end" class="text-xs p-1" @change="onDateChange(task)"></td>
+                            <td class="font-bold text-indigo-600">{{ calcDay(task.start, task.end) }}</td>
                             <td class="admin-only">
                                 <button class="text-indigo-600 font-bold mr-2" @click="$emit('edit-task', task.id)">✏️</button>
                                 <button class="text-rose-500 font-bold" @click="removeTask(task.id)">&times;</button>
@@ -820,7 +995,7 @@ const TaskTable = {
                 </table>
             </div>
 
-            <!-- 手機端卡片模式 (Touch Drag & Drop) -->
+            <!-- 手機端卡片模式 -->
             <div class="mobile-task-list">
                 <div v-for="(task, idx) in tasks" :key="'m_'+task.id" class="mobile-task-card">
                     <div class="flex justify-between items-center mb-2 pb-1.5 border-b">
@@ -841,6 +1016,7 @@ const TaskTable = {
                         <div>起：<input type="date" v-model="task.start" class="p-1 w-full" @change="onDateChange(task)"></div>
                         <div>止：<input type="date" v-model="task.end" class="p-1 w-full" @change="onDateChange(task)"></div>
                     </div>
+                    <div class="text-xs font-bold text-indigo-600">天數：{{ calcDay(task.start, task.end) }} 天</div>
                 </div>
             </div>
         </div>
@@ -876,16 +1052,32 @@ const TaskTable = {
             store.propagateTaskDates(tasks.value, task.id);
         }
 
-        /* HTML5 拖拽事件 (桌面端) */
-        function onDragStart(e, idx) {
-            draggedIndex.value = idx;
-            e.dataTransfer.effectAllowed = 'move';
+        /* ⏸️ 工期精確計算（含週末與公眾假期扣除） */
+        function calcDay(s, e) {
+            if (!s || !e) return 0;
+            let cur = new Date(s);
+            let end = new Date(e);
+            if (isNaN(cur) || isNaN(end) || cur > end) return 0;
+            if (!store.appData.excludeHolidays) return Math.ceil((end - cur) / (1000*60*60*24)) + 1;
+
+            let workDays = 0;
+            while (cur <= end) {
+                const w = cur.getDay();
+                const fullStr = formatDate(cur);
+                const mdStr = `${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+                
+                // 扣除星期六、星期日、香港公眾假期與自訂放假
+                if (w !== 0 && w !== 6 && !store.appData.customHolidays?.[fullStr] && !getHolidayName(cur.getFullYear(), mdStr)) {
+                    workDays++;
+                }
+                cur.setDate(cur.getDate() + 1);
+            }
+            return workDays;
         }
 
-        function onDragOver(e, idx) {
-            dragOverIndex.value = idx;
-        }
-
+        /* 拖拽事件 */
+        function onDragStart(e, idx) { draggedIndex.value = idx; e.dataTransfer.effectAllowed = 'move'; }
+        function onDragOver(e, idx) { dragOverIndex.value = idx; }
         function onDrop(targetIdx) {
             if (draggedIndex.value !== -1 && draggedIndex.value !== targetIdx) {
                 store.saveStateSnapshot();
@@ -893,26 +1085,15 @@ const TaskTable = {
                 const movedItem = list.splice(draggedIndex.value, 1)[0];
                 list.splice(targetIdx, 0, movedItem);
             }
-            draggedIndex.value = -1;
-            dragOverIndex.value = -1;
+            draggedIndex.value = -1; dragOverIndex.value = -1;
         }
 
-        /* 觸控手勢 (手機端 Touch Drag) */
-        function onTouchStart(e, idx) {
-            draggedIndex.value = idx;
-            touchStartY.value = e.touches[0].clientY;
-        }
-
-        function onTouchMove(e) {
-            e.preventDefault();
-        }
-
-        function onTouchEnd(idx) {
-            draggedIndex.value = -1;
-        }
+        function onTouchStart(e, idx) { draggedIndex.value = idx; touchStartY.value = e.touches[0].clientY; }
+        function onTouchMove(e) { e.preventDefault(); }
+        function onTouchEnd(idx) { draggedIndex.value = -1; }
 
         return {
-            store, tasks, draggedIndex, dragOverIndex, getTaskIndex, addTask, removeTask, onDateChange,
+            store, tasks, draggedIndex, dragOverIndex, getTaskIndex, addTask, removeTask, onDateChange, calcDay,
             onDragStart, onDragOver, onDrop, onTouchStart, onTouchMove, onTouchEnd
         };
     }
