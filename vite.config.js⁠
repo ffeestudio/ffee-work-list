@@ -1,17 +1,11 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import path from 'path';
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/ffee-work-list/', // 👈 對應您的 GitHub Repository 名稱
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src')
-    }
-  },
-  server: {
-    port: 3000,
-    open: true
+  base: '/ffee-work-list/', // ⚠️ 必須與 GitHub 儲存庫名稱一致
+  build: {
+    outDir: 'dist'
   }
 });
+
