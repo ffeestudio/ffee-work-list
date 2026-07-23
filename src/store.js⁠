@@ -1,0 +1,67 @@
+import { formatDate, getDaysBetween, addDaysStr } from './holidays.js';
+
+const firebaseConfig = {
+  apiKey: "8k51yPMqdWNUOMGw60bkRgRfBL3IfrnUbIZgGW9L",
+  authDomain: "ffee-studio-working-list.firebaseapp.com",
+  databaseURL: "[https://ffee-studio-working-list-default-rtdb.firebaseio.com](https://ffee-studio-working-list-default-rtdb.firebaseio.com)",
+  projectId: "ffee-studio-working-list",
+  storageBucket: "ffee-studio-working-list.firebasestorage.app"
+};
+
+firebase.initializeApp(firebaseConfig);
+export const db = firebase.database();
+export const storage = firebase.storage();
+export const cloudRef = db.ref('decorScheduleData');
+
+export const store = Vue.reactive({
+  isReadOnlyMode: false,
+  cloudConnected: false,
+  appData: {
+    loginPassword: "", projectList: [], currentProjectId: null, excludeHolidays: false,
+    themeMode: 'light', fontSize: 'md', staffList: ["陳大文", "張師傅", "李工"],
+    stageList: [
+      {name:"設計準備", color:"#4f46e5"}, {name:"方案設計", color:"#0891b2"},
+      {name:"施工圖設計", color:"#059669"}, {name:"現場施工", color:"#dc2626"}, {name:"竣工驗收", color:"#7c3aed"}
+    ],
+    projects: {}, customHolidays: {}
+  },
+  undoStack: [],
+
+  saveStateSnapshot() {
+    if (this.isReadOnlyMode) return;
+    if (this.undoStack.length >= 20) this.undoStack.shift();
+    this.undoStack.push(JSON.parse(JSON.stringify(this.appData)));
+  },
+
+  saveToCloud() {
+    if (this.isReadOnlyMode) return;
+    cloudRef.set(this.appData)
+      .then(() => alert('☁️ 已成功同步至雲端！'))
+      .catch(err => alert('❌ 儲存失敗：' + err.message));
+  },
+
+  applyTheme() {
+    document.body.classList.toggle('dark-mode', this.appData.themeMode === 'dark');
+  },
+
+  propagateTaskDates(tasks, changedTaskId) {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      tasks.forEach(t => {
+        if (t.dependsOn) {
+          const parent = tasks.find(p => p.id === t.dependsOn);
+          if (parent && parent.end) {
+            const requiredStart = addDaysStr(parent.end, 1);
+            if (new Date(t.start) < new Date(requiredStart)) {
+              const duration = getDaysBetween(t.start, t.end);
+              t.start = requiredStart;
+              t.end = addDaysStr(t.start, duration);
+              changed = true;
+            }
+          }
+        }
+      });
+    }
+  }
+});
