@@ -3,10 +3,9 @@ import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/ffee-work-list/', // ⚠️ 必須與 GitHub 倉庫名稱一致
+  base: '/ffee-work-list/',
   build: {
     outDir: 'dist'
   }
 });
-
 
